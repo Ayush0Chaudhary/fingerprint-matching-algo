@@ -8,11 +8,11 @@ import psutil
 # import re
 # cProfile.run('re.compile("foo|bar")')
 sample = cv2.imread('SOCOFing/Altered/Altered-Easy/1__M_Left_little_finger_CR.BMP')
-sift = cv2.SIFT_create()
-kp1, des1 = sift.detectAndCompute(sample, None)
+orb = cv2.ORB_create()
+kp1, des1 = orb.detectAndCompute(sample, None)
 def compute_keypoints_descriptors(file):
     fingerprint_image = cv2.imread(os.path.join('SOCOFing/Real/', file))
-    kp2, des2 = sift.detectAndCompute(fingerprint_image, None)
+    kp2, des2 = orb.detectAndCompute(fingerprint_image, None)
     kp2_info = [(kp.pt, kp.size, kp.angle, kp.response, kp.octave, kp.class_id) for kp in kp2]
     return file, kp2_info, des2
 
@@ -24,12 +24,19 @@ def knn_match(args):
     kp2 = [cv2.KeyPoint(x, y, _size, _angle, _response, _octave, _class_id) 
            for (x, y), _size, _angle, _response, _octave, _class_id in kp2_info]
     
-
-    matches = cv2.FlannBasedMatcher({'algorithm': 1, 'trees': 10}, {}).knnMatch(des1, des2, k=2)
+    FLANN_INDEX_LSH = 6
+    index_params = dict(algorithm = FLANN_INDEX_LSH,
+                    table_number = 6, # 12
+                    key_size = 12,    # 20
+                    multi_probe_level = 1) #2
+    search_params = dict(checks=1)   # or pass empty dictionary
+    matches = cv2.FlannBasedMatcher(index_params,search_params).knnMatch(des1, des2, k=2)
     match_point = []
-    for p, q in matches:
-        if p.distance < 0.1 * q.distance:
-            match_point.append(p)
+    for p_q in matches:
+        if len(p_q) == 2:
+            p, q = p_q
+            if p.distance < 0.3 * q.distance:
+                match_point.append(p)
 
     keypoints = min(len(kp1), len(kp2))
     score = len(match_point) / keypoints * 100
